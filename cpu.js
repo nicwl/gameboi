@@ -101,6 +101,27 @@ class CPU {
     return this.memory.read(address);
   }
 
+  convert8to16(addr) {
+    if (addr & (1 << 7)) {
+      addr = addr | 0xff00;
+    }
+    return (0xff00 + addr) & 0xffff;
+  }
+
+  get8from8(addr) {
+    addr = this.convert8to16(addr);
+    let low = addr & 0xff;
+    let high = (addr & 0xff00) >> 8;
+    return this.get8from16(low, high);
+  }
+
+  store8at8ValueAddress(value, addr) {
+    addr = this.convert8to16(addr);
+    let low = addr & 0xff;
+    let high = (addr & 0xff00) >> 8;
+    return this.store8At16ValueAddress(value, low, high);
+  }
+
   xor8(value) {
     this.internalRegisters[A] ^= (value & 0xff);
   }
@@ -384,7 +405,11 @@ class CPU {
 
   getLoadInstructionTable() {
     return Object.assign(
-      this.getLoadNonImmediateIntoRegisterTable()
+      this.getLoadNonImmediateIntoRegisterTable(),
+      this.getLoadAccumulatorIntoMemoryTable(),
+      this.getLoadMemoryIntoAccumulatorTable(),
+      this.getLoadImmediateTable(),
+      this.getLoadMiscTable(),
     );
   }
 
@@ -409,5 +434,69 @@ class CPU {
       table[instruction] = [1, clocks, load.concat(store)];
     }
     return table;
+  }
+
+  getLoadAccumulatorIntoMemoryTable() {
+    let table = {};
+    let registers = [[C, B], [E, D], [L, H], [L, H]];
+    let post = [[], [],
+      [this.push(L), this.push(H), this.incrementRegister16],
+      [this.push(L), this.push(H), this.decRegister16],
+    ];
+    for (let prefix = 0x0; prefix <= 0x3; prefix++) {
+      let instruction = (prefix << 4) | 0x2;
+      let [low, high] = registers[prefix];
+      let after = post[prefix];
+      let microcode = [this.push(A), this.getRegister8,
+        this.push(low), this.getRegister8, this.push(high), this.getRegister8,
+        this.store8At16ValueAddress].concat(after);
+      table[instruction] = [1, 8, microcode];
+    }
+    return table;
+  }
+
+  getLoadMemoryIntoAccumulatorTable() {
+    let table = {};
+    let registers = [[C, B], [E, D], [L, H], [L, H]];
+    let post = [[], [],
+      [this.push(L), this.push(H), this.incrementRegister16],
+      [this.push(L), this.push(H), this.decRegister16],
+    ];
+    for (let prefix = 0x0; prefix <= 0x3; prefix++) {
+      let instruction = (prefix << 4) | 0xA;
+      let [low, high] = registers[prefix];
+      let after = post[prefix];
+      let microcode = [
+        this.push(low), this.getRegister8, this.push(high), this.getRegister8,
+        this.get8from16,
+        this.push(A), this.setRegisterByteReg].concat(after);
+      table[instruction] = [1, 8, microcode];
+    }
+    return table;
+  }
+
+  getLoadImmediateTable() {
+    let table = {};
+    for (let dest = 0; dest <= 7; dest++) {
+      let instruction = (dest << 3) | 0x6;
+      let store = (dest == 6)
+        ? [this.push(L), this.getRegister8, this.push(H), this.getRegister8, this.store8At16ValueAddress]
+        : [this.push(dest), this.setRegisterByteReg];
+      let microcode = [this.getImmediate8].concat(store);
+      let clocks = (dest == 6) ? 12 : 8;
+      table[instruction] = [2, clocks, microcode];
+    }
+    return table;
+  }
+
+  getLoadMiscTable() {
+    return {
+      0xe0: [2, 12, [this.push(A), this.getRegister8, this.getImmediate8, this.store8at8ValueAddress]],
+      // 0xf0: [2, 12, [this.getImmediate8, this.get8from8, this.push(A), this.setRegisterByteReg]],
+      // 0xe2: [2, 8, [this.push(A), this.getRegister8, this.push(C), this.getRegister8, this.store8at8ValueAddress]],
+      // 0xf2: [2, 8, [this.push(C), this.getRegister8, this.get8from8, this.push(A), this.setRegisterByteReg]],
+      // 0xea: [3, 16, [this.getImmediate16, this.push(A), this.getRegister8, this.store8At16AddressValuePair]],
+      // 0xfa: [3, 16, [this.getImmediate16, this.get8from16, this.push(A), this.setRegisterByteReg]],
+    }
   }
 }
