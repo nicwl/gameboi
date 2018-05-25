@@ -3,29 +3,63 @@
     <title>Game boi</title>
     <script type="text/javascript" src="cpu.js"></script>
     <script type="text/javascript" src="memory.js"></script>
+    <script type="text/javascript" src="lcd.js"></script>
     <script type="text/javascript" src="bootstraprom.js"></script>
     <script type="text/javascript" src="ram.js"></script>
+    <script type="text/javascript" src="fakerom.js"></script>
   </head>
-  <body>
+  <body style="background-color: black">
+    <canvas id="screen" width="160" height="140"></canvas>
     <script type="text/javascript">
       let memory = new Memory({
         bootstrapROM: new BootstrapROM(),
         videoRAM: new RAM(0x2000),
-        stack: new RAM(127)
+        stack: new RAM(127),
+        io: new RAM(0x80),
+        romBank: new FakeRom()
       });
       let cpu = new CPU(memory);
-      function step() {
-        try {
-          for (let i = 0; i < 40; i++) {
-            cpu.execute();
-          }
-          setTimeout(step, 1);
-        } catch (e) {
-          throw e;
-          document.write("done");
+      let lcd = new LCD(memory, document.getElementById("screen"));
+      const CPU_HZ = 4.1*1000000;
+      let clocksPerFrame = null;
+      let hzs = [];
+      let prevTime = null;
+      let prevClock = null;
+
+      function step(currentTime) {
+        if (cpu.clock != 0) {
+          let elapsed = currentTime - prevTime;
+          let actualHz = (cpu.clock - prevClock) / elapsed * 1000;
+          hzs.push(actualHz/1000000);
         }
+        prevTime = currentTime;
+        prevClock = cpu.clock;
+        while (cpu.clock < prevClock + clocksPerFrame) {
+          let startClock = cpu.clock;
+          cpu.execute();
+          if (cpu.clock % 100 < startClock % 100) {
+            lcd.execute();
+          }
+        }
+        requestAnimationFrame(step);
       }
-      setTimeout(step, 1);
+
+      // test frame rate
+      (function () {
+        let numFrames = 0;
+        let startTime = performance.now();
+        function animate(currentTime) {
+          numFrames += 1;
+          if (currentTime < startTime + 1000) {
+            requestAnimationFrame(animate);
+          } else {
+            let fps = numFrames / (currentTime - startTime) * 1000;
+            clocksPerFrame = CPU_HZ / fps;
+            requestAnimationFrame(step);
+          }
+        }
+        requestAnimationFrame(animate);
+      })();
     </script>
   </body>
 </html>

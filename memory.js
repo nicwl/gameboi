@@ -44,15 +44,27 @@ class Memory {
     if (this.bootstrapROM !== null && address <= 0xff) {
       return {'region': this.bootstrapROM, 'offset': address}
     }
-    let last = null;
-    let regionStart = null;
-    for (let [startAddr, region] of this.map) {
-      if (startAddr <= address) {
-        last = region;
-        regionStart = startAddr;
-      }
+    if (address < 0x4000) {
+      return {'region': this.romBank, 'offset': address};
+    } else if (address < 0x8000) {
+      return {'region': this.switchableROMBank, 'offset': address - 0x4000};
+    } else if (address < 0xa000) {
+      return {'region': this.videoRAM, 'offset': address - 0x8000};
+    } else if (address < 0xc000) {
+      return {'region': this.switchableRAM, 'offset': adress - 0xa000};
+    } else if (address < 0xe000) {
+      return {'region': this.internalRAM, 'offset': address - 0xc000};
+    } else if (address < 0xfe00) {
+      return {'region': this.internalRAM, 'offset': address - 0xe000};
+    } else if (address < 0xff00) {
+      return {'region': this.oam, 'offset': address - 0xfe00};
+    } else if (address < 0xff80) {
+      return {'region': this.io, 'offset': address - 0xff00};
+    } else if (address < 0xffff) {
+      return {'region': this.stack, 'offset': address - 0xff80};
+    } else {
+      return {'region': this.enableInterruptRegister, 'offset': 0};
     }
-    return {'region': last, 'offset': address - regionStart}
   }
 
   read(address) {

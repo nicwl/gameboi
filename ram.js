@@ -1,6 +1,6 @@
 class RAM {
   constructor(size) {
-    this.bytes = new Array(size).fill(1);
+    this.bytes = new Array(size).fill(0);
   }
 
   read(address) {

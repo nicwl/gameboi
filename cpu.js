@@ -101,6 +101,19 @@ class CPU {
     this.internalRegisters[A] ^= (value & 0xff);
   }
 
+  sub8(value) {
+    let result = this.internalRegisters[A] += ((~value) + 1) & 0xff;
+    this.flags &= ~((1<<FLAG_Z) | (1 << FLAG_C)); // no idea what half carry is
+    if (result > 0xff) {
+      this.flags |= (1 << FLAG_C);
+    }
+    if ((result & 0xff) == 0) {
+      this.flags |= (1 << FLAG_Z);
+    }
+    this.flags |= (1 << FLAG_N);
+    this.internalRegisters[A] &= 0xff;
+  }
+
   checkBit(bit, byte) {
     let result = ((1 << bit) & ~byte) >> bit;
     this.flags &= ~(1<<FLAG_Z);
@@ -152,10 +165,19 @@ class CPU {
     return this.jumpAbsolute16(condition, [low, high]);
   }
 
-  rotateLeft(register) {
+  rotateLeftThroughCarry(register) {
+    let oldCarry = (this.flags & (1 << FLAG_C)) >> FLAG_C;
     let value = this.internalRegisters[register];
     let carry = (value & (1<<7)) >> 7;
-    this.internalRegisters[register] = (value << 1) | carry;
+    this.internalRegisters[register] = ((value << 1) & 0xff) | oldCarry;
+    this.flags &= (~(1<<FLAG_C));
+    this.flags &= (~(1<<FLAG_Z));
+    if (carry == 1) {
+      this.flags |= (1 << FLAG_C);
+    }
+    if (this.internalRegisters[register] == 0) {
+      this.flags |= (1 << FLAG_Z);
+    }
   }
 
   setPrefixCB() {
@@ -249,7 +271,7 @@ class CPU {
       0x04: [1, 4, [push(B), this.incrementRegister8]],
       0x14: [1, 4, [push(D), this.incrementRegister8]],
       0x24: [1, 4, [push(H), this.incrementRegister8]],
-      0x17: [1, 4, [push(A), this.rotateLeft]],
+      0x17: [1, 4, [push(A), this.rotateLeftThroughCarry]],
       0xa8: [1, 4, [push(B), this.getRegister8, this.xor8]],
       0xa9: [1, 4, [push(C), this.getRegister8, this.xor8]],
       0xaa: [1, 4, [push(D), this.getRegister8, this.xor8]],
@@ -257,6 +279,12 @@ class CPU {
       0xac: [1, 4, [push(H), this.getRegister8, this.xor8]],
       0xad: [1, 4, [push(L), this.getRegister8, this.xor8]],
       0xaf: [1, 4, [push(A), this.getRegister8, this.xor8]],
+      0x90: [1, 4, [push(B), this.getRegister8, this.sub8]],
+      0x91: [1, 4, [push(C), this.getRegister8, this.sub8]],
+      0x92: [1, 4, [push(D), this.getRegister8, this.sub8]],
+      0x93: [1, 4, [push(E), this.getRegister8, this.sub8]],
+      0x94: [1, 4, [push(H), this.getRegister8, this.sub8]],
+      0x95: [1, 4, [push(L), this.getRegister8, this.sub8]],
       0x4f: [1, 4, [push(A), this.getRegister8, push(C), this.setRegister8]],
       0x5f: [1, 4, [push(A), this.getRegister8, push(E), this.setRegister8]],
       0x6f: [1, 4, [push(A), this.getRegister8, push(L), this.setRegister8]],
@@ -268,6 +296,10 @@ class CPU {
       0x47: [1, 4, [push(A), this.getRegister8, push(B), this.setRegister8]],
       0x57: [1, 4, [push(A), this.getRegister8, push(D), this.setRegister8]],
       0x67: [1, 4, [push(A), this.getRegister8, push(H), this.setRegister8]],
+      0x4c: [1, 4, [push(H), this.getRegister8, push(C), this.setRegister8]],
+      0x5c: [1, 4, [push(H), this.getRegister8, push(E), this.setRegister8]],
+      0x6c: [1, 4, [push(H), this.getRegister8, push(L), this.setRegister8]],
+      0x7c: [1, 4, [push(H), this.getRegister8, push(A), this.setRegister8]],
       0xf0: [2, 12, [this.getImmediate8, push(0xff), this.get8from16, push(A), this.setRegister8]],
       0xe2: [1, 8, [push(C), this.getRegister8, push(0xff), push(A), this.getRegister8, this.store8at16]],
       0x77: [1, 8, [push(L), this.getRegister8, push(H), this.getRegister8, push(A), this.getRegister8, this.store8at16]],
@@ -313,13 +345,13 @@ class CPU {
 
     return {
       0x7c: [1, 8, [push(7), push(H), this.getRegister8, this.checkBit]],
-      0x10: [1, 8, [push(B), this.rotateLeft]],
-      0x11: [1, 8, [push(C), this.rotateLeft]],
-      0x12: [1, 8, [push(D), this.rotateLeft]],
-      0x13: [1, 8, [push(E), this.rotateLeft]],
-      0x14: [1, 8, [push(H), this.rotateLeft]],
-      0x15: [1, 8, [push(L), this.rotateLeft]],
-      0x17: [1, 8, [push(A), this.rotateLeft]],
+      0x10: [1, 8, [push(B), this.rotateLeftThroughCarry]],
+      0x11: [1, 8, [push(C), this.rotateLeftThroughCarry]],
+      0x12: [1, 8, [push(D), this.rotateLeftThroughCarry]],
+      0x13: [1, 8, [push(E), this.rotateLeftThroughCarry]],
+      0x14: [1, 8, [push(H), this.rotateLeftThroughCarry]],
+      0x15: [1, 8, [push(L), this.rotateLeftThroughCarry]],
+      0x17: [1, 8, [push(A), this.rotateLeftThroughCarry]],
     }
   }
 }
