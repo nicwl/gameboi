@@ -1,13 +1,13 @@
-const A = 0;
-const F = 1;
-const B = 2;
-const C = 3;
-const D = 4;
-const E = 5;
-const H = 6;
-const L = 7;
-const S = 8;
-const P = 9;
+const B = 0;
+const C = 1;
+const D = 2;
+const E = 3;
+const H = 4;
+const L = 5;
+const S = 6;
+const A = 7;
+const P = 8;
+const F = 9;
 
 const FLAG_Z = 7;
 const FLAG_N = 6;
@@ -47,7 +47,7 @@ class CPU {
     this.internalRegisters[highr] = high;
   }
 
-  setRegister8(byte, reg) {
+  setRegisterByteReg(byte, reg) {
     this.internalRegisters[reg] = byte;
   }
 
@@ -82,14 +82,18 @@ class CPU {
     this.internalRegisters[toInc] = (this.internalRegisters[toInc] + 1) & 0xff;
   }
 
-  store8at16(low, high, value) {
+  store8At16AddressValue(low, high, value) {
     let address = low | (high << 8);
     this.memory.write(address, value);
   }
 
-  store8at16Pair(address, value) {
+  store8At16ValueAddress(value, low, high) {
+    this.store8At16AddressValue(low, high, value);
+  }
+
+  store8At16AddressValuePair(address, value) {
     let [low, high] = address;
-    return this.store8at16(low, high, value);
+    return this.store8At16AddressValue(low, high, value);
   }
 
   get8from16(low, high) {
@@ -219,6 +223,18 @@ class CPU {
     return ((this.pc + this.instructionSize) & 0xff00) >> 8;
   }
 
+  stop() {
+    throw new Error("CPU stopped");
+  }
+
+  unimplementedInstruction() {
+    throw new Error("Instruction 0x" + this.memory.read(this.pc).toString(16) + " not implemented");
+  }
+
+  push(x) {
+    return function() { return x; };
+  }
+
   runMicrocode(microcode) {
     let stk = [];
     let last = false;
@@ -240,6 +256,15 @@ class CPU {
   }
 
   getInstructionTable() {
+    return Object.assign(
+      {},
+      this.getAdHocInstructionTable(),
+      this.getMiscInstructionTable(),
+      this.getLoadInstructionTable()
+    );
+  }
+
+  getAdHocInstructionTable() {
     let push = function(x) {
       return function() { return x; };
     };
@@ -256,14 +281,14 @@ class CPU {
       0x1d: [1, 4, [push(E), this.decRegister8]],
       0x2d: [1, 4, [push(L), this.decRegister8]],
       0x3d: [1, 4, [push(A), this.decRegister8]],
-      0x1a: [1, 8, [push(E), this.getRegister8, push(D), this.getRegister8, this.get8from16, push(A), this.setRegister8]],
-      0x06: [2, 8, [this.getImmediate8, push(B), this.setRegister8]],
-      0x16: [2, 8, [this.getImmediate8, push(D), this.setRegister8]],
-      0x26: [2, 8, [this.getImmediate8, push(H), this.setRegister8]],
-      0x0e: [2, 8, [this.getImmediate8, push(C), this.setRegister8]],
-      0x1e: [2, 8, [this.getImmediate8, push(E), this.setRegister8]],
-      0x2e: [2, 8, [this.getImmediate8, push(L), this.setRegister8]],
-      0x3e: [2, 8, [this.getImmediate8, push(A), this.setRegister8]],
+      0x1a: [1, 8, [push(E), this.getRegister8, push(D), this.getRegister8, this.get8from16, push(A), this.setRegisterByteReg]],
+      0x06: [2, 8, [this.getImmediate8, push(B), this.setRegisterByteReg]],
+      0x16: [2, 8, [this.getImmediate8, push(D), this.setRegisterByteReg]],
+      0x26: [2, 8, [this.getImmediate8, push(H), this.setRegisterByteReg]],
+      0x0e: [2, 8, [this.getImmediate8, push(C), this.setRegisterByteReg]],
+      0x1e: [2, 8, [this.getImmediate8, push(E), this.setRegisterByteReg]],
+      0x2e: [2, 8, [this.getImmediate8, push(L), this.setRegisterByteReg]],
+      0x3e: [2, 8, [this.getImmediate8, push(A), this.setRegisterByteReg]],
       0x0c: [1, 4, [push(C), this.incrementRegister8]],
       0x1c: [1, 4, [push(E), this.incrementRegister8]],
       0x2c: [1, 4, [push(L), this.incrementRegister8]],
@@ -285,56 +310,40 @@ class CPU {
       0x93: [1, 4, [push(E), this.getRegister8, this.sub8]],
       0x94: [1, 4, [push(H), this.getRegister8, this.sub8]],
       0x95: [1, 4, [push(L), this.getRegister8, this.sub8]],
-      0x4f: [1, 4, [push(A), this.getRegister8, push(C), this.setRegister8]],
-      0x5f: [1, 4, [push(A), this.getRegister8, push(E), this.setRegister8]],
-      0x6f: [1, 4, [push(A), this.getRegister8, push(L), this.setRegister8]],
-      0x7f: [1, 4, [push(A), this.getRegister8, push(A), this.setRegister8]],
-      0x4b: [1, 4, [push(E), this.getRegister8, push(C), this.setRegister8]],
-      0x5b: [1, 4, [push(E), this.getRegister8, push(E), this.setRegister8]],
-      0x6b: [1, 4, [push(E), this.getRegister8, push(L), this.setRegister8]],
-      0x7b: [1, 4, [push(E), this.getRegister8, push(A), this.setRegister8]],
-      0x47: [1, 4, [push(A), this.getRegister8, push(B), this.setRegister8]],
-      0x57: [1, 4, [push(A), this.getRegister8, push(D), this.setRegister8]],
-      0x67: [1, 4, [push(A), this.getRegister8, push(H), this.setRegister8]],
-      0x4c: [1, 4, [push(H), this.getRegister8, push(C), this.setRegister8]],
-      0x5c: [1, 4, [push(H), this.getRegister8, push(E), this.setRegister8]],
-      0x6c: [1, 4, [push(H), this.getRegister8, push(L), this.setRegister8]],
-      0x7c: [1, 4, [push(H), this.getRegister8, push(A), this.setRegister8]],
-      0xf0: [2, 12, [this.getImmediate8, push(0xff), this.get8from16, push(A), this.setRegister8]],
-      0xe2: [1, 8, [push(C), this.getRegister8, push(0xff), push(A), this.getRegister8, this.store8at16]],
-      0x77: [1, 8, [push(L), this.getRegister8, push(H), this.getRegister8, push(A), this.getRegister8, this.store8at16]],
-      0xe0: [2, 12, [this.getImmediate8, push(0xff), push(A), this.getRegister8, this.store8at16]],
-      0x22: [1, 8, [push(L), this.getRegister8, push(H), this.getRegister8, push(A), this.getRegister8, this.store8at16,
+      0xf0: [2, 12, [this.getImmediate8, push(0xff), this.get8from16, push(A), this.setRegisterByteReg]],
+      0xe2: [1, 8, [push(C), this.getRegister8, push(0xff), push(A), this.getRegister8, this.store8At16AddressValue]],
+      0xe0: [2, 12, [this.getImmediate8, push(0xff), push(A), this.getRegister8, this.store8At16AddressValue]],
+      0x22: [1, 8, [push(L), this.getRegister8, push(H), this.getRegister8, push(A), this.getRegister8, this.store8At16AddressValue,
                     push(L), push(H), this.incrementRegister16]],
       0x03: [1, 8, [push(C), push(B), this.incrementRegister16]],
       0x13: [1, 8, [push(E), push(D), this.incrementRegister16]],
       0x23: [1, 8, [push(L), push(H), this.incrementRegister16]],
       0x33: [1, 8, [push(P), push(S), this.incrementRegister16]],
-      0x32: [1, 8, [push(L), this.getRegister8, push(H), this.getRegister8, push(A), this.getRegister8, this.store8at16, push(L), push(H), this.decRegister16]],
+      0x32: [1, 8, [push(L), this.getRegister8, push(H), this.getRegister8, push(A), this.getRegister8, this.store8At16AddressValue, push(L), push(H), this.decRegister16]],
       0xcb: [1, 4, [this.setPrefixCB]],
       0x18: [2, 12, [push(true), this.getImmediate8, this.jumpRelative8]],
       0x20: [2, 8, [push(FLAG_Z), this.checkFlag, this.negate, this.getImmediate8, this.jumpRelative8]],
       0x28: [2, 8, [push(FLAG_Z), this.checkFlag, this.getImmediate8, this.jumpRelative8]],
       0xcd: [3, 24, [push(P), push(S), this.decRegister16,
-                     push(P), this.getRegister8, push(S), this.getRegister8, this.pcHigh, this.store8at16,
+                     push(P), this.getRegister8, push(S), this.getRegister8, this.pcHigh, this.store8At16AddressValue,
                      push(P), push(S), this.decRegister16,
-                     push(P), this.getRegister8, push(S), this.getRegister8, this.pcLow, this.store8at16,
+                     push(P), this.getRegister8, push(S), this.getRegister8, this.pcLow, this.store8At16AddressValue,
                      push(true), this.getImmediate16, this.jumpAbsolute16]],
       0xc5: [1, 16, [push(P), push(S), this.decRegister16,
-                     push(P), this.getRegister8, push(S), this.getRegister8, push(C), this.getRegister8, this.store8at16,
+                     push(P), this.getRegister8, push(S), this.getRegister8, push(C), this.getRegister8, this.store8At16AddressValue,
                      push(P), push(S), this.decRegister16,
-                     push(P), this.getRegister8, push(S), this.getRegister8, push(B), this.getRegister8, this.store8at16]],
+                     push(P), this.getRegister8, push(S), this.getRegister8, push(B), this.getRegister8, this.store8At16AddressValue]],
       0xc9: [1, 16, [push(true), push(P), this.getRegister8, push(S), this.getRegister8, this.get8from16,
                       push(P), push(S), this.incrementRegister16,
                       push(P), this.getRegister8, push(S), this.getRegister8, this.get8from16,
                       push(P), push(S), this.incrementRegister16,
                       this.jumpAbsolute16Pair]],
-      0xc1: [1, 12, [push(P), this.getRegister8, push(S), this.getRegister8, this.get8from16, push(B), this.setRegister8,
+      0xc1: [1, 12, [push(P), this.getRegister8, push(S), this.getRegister8, this.get8from16, push(B), this.setRegisterByteReg,
                      push(P), push(S), this.incrementRegister16,
-                     push(P), this.getRegister8, push(S), this.getRegister8, this.get8from16, push(C), this.setRegister8,
+                     push(P), this.getRegister8, push(S), this.getRegister8, this.get8from16, push(C), this.setRegisterByteReg,
                      push(P), push(S), this.incrementRegister16]],
       0xfe: [2, 8, [push(A), this.getImmediate8, this.compare]],
-      0xea: [3, 16, [this.getImmediate16, push(A), this.getRegister8, this.store8at16Pair]]
+      0xea: [3, 16, [this.getImmediate16, push(A), this.getRegister8, this.store8At16AddressValuePair]]
     }
   }
 
@@ -353,5 +362,52 @@ class CPU {
       0x15: [1, 8, [push(L), this.rotateLeftThroughCarry]],
       0x17: [1, 8, [push(A), this.rotateLeftThroughCarry]],
     }
+  }
+
+  // microcode generation
+  getMiscInstructionTable() {
+    return {
+      // NOP
+      0x00: [1, 4, []],
+      // STOP
+      0x10: [2, 4, [this.stop]],
+      // HALT
+      0x76: [1, 4, [this.unimplementedInstruction]],
+      // Prefix CB
+      0xCB: [1, 4, [this.setPrefixCB]],
+      // DI
+      0xF3: [1, 4, [this.unimplementedInstruction]],
+      // EI
+      0xFB: [1, 4, [this.unimplementedInstruction]]
+    };
+  }
+
+  getLoadInstructionTable() {
+    return Object.assign(
+      this.getLoadNonImmediateIntoRegisterTable()
+    );
+  }
+
+  getLoadNonImmediateIntoRegisterTable() {
+    let table = {};
+    for (let instruction = 0x40; instruction <= 0x7f; instruction++) {
+      if (instruction == 0x76) {
+        // There's no LD (HL), (HL). This is the HALT instruction defined elsewhere.
+        continue;
+      }
+      let dest = (instruction & 0x38) >> 3;
+      let src = (instruction & 0x7);
+      let load = (src == 6)
+        ? [this.push(L), this.getRegister8, this.push(H), this.getRegister8, this.get8from16]
+        : [this.push(src), this.getRegister8];
+      let store = (dest == 6)
+        ? [this.push(L), this.getRegister8, this.push(H), this.getRegister8, this.store8At16ValueAddress]
+        : [this.push(dest), this.setRegisterByteReg];
+
+      let clocks = (src == 6 || dest == 6) ? 8 : 4;
+
+      table[instruction] = [1, clocks, load.concat(store)];
+    }
+    return table;
   }
 }
