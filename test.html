@@ -1,0 +1,31 @@
+<html>
+  <head>
+    <title>Game boi</title>
+    <script type="text/javascript" src="cpu.js"></script>
+    <script type="text/javascript" src="memory.js"></script>
+    <script type="text/javascript" src="bootstraprom.js"></script>
+    <script type="text/javascript" src="ram.js"></script>
+  </head>
+  <body>
+    <script type="text/javascript">
+      let memory = new Memory({
+        bootstrapROM: new BootstrapROM(),
+        videoRAM: new RAM(0x2000),
+        stack: new RAM(127)
+      });
+      let cpu = new CPU(memory);
+      function step() {
+        try {
+          for (let i = 0; i < 40; i++) {
+            cpu.execute();
+          }
+          setTimeout(step, 1);
+        } catch (e) {
+          throw e;
+          document.write("done");
+        }
+      }
+      setTimeout(step, 1);
+    </script>
+  </body>
+</html>
