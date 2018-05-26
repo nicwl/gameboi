@@ -41,7 +41,7 @@ class Memory {
   }
 
   mapAddress(address) {
-    if (this.bootstrapROM !== null && address <= 0xff) {
+    if (this.io.bootstrapROMEnabled && address <= 0xff) {
       return {'region': this.bootstrapROM, 'offset': address}
     }
     if (address < 0x4000) {

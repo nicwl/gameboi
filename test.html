@@ -4,9 +4,11 @@
     <script type="text/javascript" src="cpu.js"></script>
     <script type="text/javascript" src="memory.js"></script>
     <script type="text/javascript" src="lcd.js"></script>
+    <script type="text/javascript" src="speaker.js"></script>
     <script type="text/javascript" src="bootstraprom.js"></script>
     <script type="text/javascript" src="ram.js"></script>
-    <script type="text/javascript" src="fakerom.js"></script>
+    <script type="text/javascript" src="io.js"></script>
+    <script type="text/javascript" src="roms/PokemonRed.js"></script>
   </head>
   <body style="background-color: black">
     <canvas id="screen" width="800" height="140"></canvas>
@@ -15,11 +17,13 @@
         bootstrapROM: new BootstrapROM(),
         videoRAM: new RAM(0x2000),
         stack: new RAM(127),
-        io: new RAM(0x80),
-        romBank: new FakeRom()
+        internalRAM: new RAM(0x2000),
+        io: new IO(new RAM(0x80)),
+        romBank: new PokemonRed()
       });
       let cpu = new CPU(memory);
       let lcd = new LCD(memory, document.getElementById("screen"));
+      let speaker = new Speaker(memory);
       const CPU_HZ = 4.1*1000000;
       let clocksPerFrame = null;
       let hzs = [];
@@ -40,6 +44,7 @@
           if (cpu.clock % 100 < startClock % 100) {
             lcd.execute();
           }
+          speaker.execute();
         }
         requestAnimationFrame(step);
       }

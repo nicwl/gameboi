@@ -9,9 +9,10 @@ class FakeRom {
   }
 
   read(address) {
-    if (address >= 0x104 && address <= 0x133) {
+    if (address >= 0x104 && address < 0x134) {
       return this.nintendoLogo[address-0x104];
     }
     console.error("Bad read of fake ROM at 0x" + address.toString(16));
+    return 0x10;
   }
 }

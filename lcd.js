@@ -81,6 +81,8 @@ class LCD {
         let byte2 = this.memory.read(this.getTileDataTableAddress() + tile*16 + pixelY*2 + 1);
         for (let pixelX = 0; pixelX < 8; pixelX++) {
           let pixel = ((byte2 & (1 << pixelX)) >> (pixelX - 1)) | ((byte1 & (1 << pixelX)) >> pixelX);
+          // This condition saves a lot of time, but may be less effective after boot.
+          // Maybe render the line all at once, after it's calculated?
           if (this.screen[this.ly][x+7-pixelX] !== pixel) {
             this.screen[this.ly][x+7-pixelX] = pixel;
             this.setPixel(x + 7 - pixelX, this.ly, pixel);

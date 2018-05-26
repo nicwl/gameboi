@@ -1,6 +1,7 @@
 class RAM {
   constructor(size) {
-    this.bytes = new Array(size).fill(0);
+    this.bytes = new Array(size);
+    for (let i = 0; i < size; i++) this.bytes[i] = 0;
   }
 
   read(address) {
