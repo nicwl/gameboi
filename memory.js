@@ -15,8 +15,7 @@ class BadMemory {
 
 class Memory {
   constructor(memories) {
-    this.romBank = memories.romBank || new BadMemory('romBank');
-    this.switchableROMBank = memories.switchableROMBank || new BadMemory('switchableROMBank');
+    this.cartridge = memories.cartridge || new BadMemory('cartridge');
     this.videoRAM = memories.videoRAM || new BadMemory('videoRAM');
     this.switchableRAM = memories.switchableRAM || new BadMemory('switchableRAM');
     this.internalRAM = memories.internalRAM || new BadMemory('internalRAM');
@@ -25,33 +24,18 @@ class Memory {
     this.stack = memories.stack || new BadMemory('stack');
     this.enableInterruptRegister = memories.enableInterruptRegister || new BadMemory('enableInterruptRegister');
     this.bootstrapROM = memories.bootstrapROM || new BadMemory('bootstrapROM');
-
-    this.map = [
-      [0x0000, this.romBank],
-      [0x4000, this.switchableROMBank],
-      [0x8000, this.videoRAM],
-      [0xa000, this.switchableRAM],
-      [0xc000, this.internalRAM],
-      [0xe000, this.internalRAM],
-      [0xfe00, this.oam],
-      [0xff00, this.io],
-      [0xff80, this.stack],
-      [0xffff, this.enableInterruptRegister],
-    ];
   }
 
   mapAddress(address) {
     if (this.io.bootstrapROMEnabled && address <= 0xff) {
       return {'region': this.bootstrapROM, 'offset': address}
     }
-    if (address < 0x4000) {
-      return {'region': this.romBank, 'offset': address};
-    } else if (address < 0x8000) {
-      return {'region': this.switchableROMBank, 'offset': address - 0x4000};
+    if (address < 0x8000) {
+      return {'region': this.cartridge, 'offset': address};
     } else if (address < 0xa000) {
       return {'region': this.videoRAM, 'offset': address - 0x8000};
     } else if (address < 0xc000) {
-      return {'region': this.switchableRAM, 'offset': adress - 0xa000};
+      return {'region': this.cartridge, 'offset': address};
     } else if (address < 0xe000) {
       return {'region': this.internalRAM, 'offset': address - 0xc000};
     } else if (address < 0xfe00) {

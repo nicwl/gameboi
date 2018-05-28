@@ -8,7 +8,8 @@
     <script type="text/javascript" src="bootstraprom.js"></script>
     <script type="text/javascript" src="ram.js"></script>
     <script type="text/javascript" src="io.js"></script>
-    <script type="text/javascript" src="roms/PokemonRed.js"></script>
+    <script type="text/javascript" src="cartridge.js"></script>
+    <script type="text/javascript" src="roms/OpSpHl.js"></script>
   </head>
   <body style="background-color: black">
     <canvas id="screen" width="800" height="140"></canvas>
@@ -19,7 +20,7 @@
         stack: new RAM(127),
         internalRAM: new RAM(0x2000),
         io: new IO(new RAM(0x80)),
-        romBank: new PokemonRed()
+        cartridge: new Cartridge(new OpSpHl()),
       });
       let cpu = new CPU(memory);
       let lcd = new LCD(memory, document.getElementById("screen"));
@@ -30,11 +31,17 @@
       let prevTime = null;
       let prevClock = null;
 
+      // Breakpoints
+      // cpu.instructionBreakpoints[0x0800dd] = 1;
+
       function step(currentTime) {
         if (cpu.clock != 0) {
           let elapsed = currentTime - prevTime;
           let actualHz = (cpu.clock - prevClock) / elapsed * 1000;
           hzs.push(actualHz/1000000);
+        }
+        if (cpu.clock > 300011152) {
+          throw new Error("CPU ran for too long");
         }
         prevTime = currentTime;
         prevClock = cpu.clock;
@@ -43,8 +50,8 @@
           cpu.execute();
           if (cpu.clock % 100 < startClock % 100) {
             lcd.execute();
+            speaker.execute();
           }
-          speaker.execute();
         }
         requestAnimationFrame(step);
       }
