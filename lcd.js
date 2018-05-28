@@ -5,6 +5,7 @@ const REG_LY = 0xff44;
 const REG_LYC = 0Xff45;
 const REG_WY = 0xff4a;
 const REG_WX = 0xff4b;
+const REG_PALETTE = 0xff47;
 const LCD_HEIGHT = 144;
 const LCD_WIDTH = 160;
 
@@ -27,9 +28,9 @@ class LCD {
     if (c == 0) {
       colour = "#FFFFFF";
     } else if (c == 1) {
-      colour = "#000000";
+      colour = "#AAAAAA";
     } else if (c == 2) {
-      colour = "#000000"
+      colour = "#555555"
     } else {
       colour = "#000000";
     }
@@ -45,6 +46,7 @@ class LCD {
     this.wy = memory.read(REG_WY);
     this.wx = memory.read(REG_WX);
     this.lcdc = memory.read(REG_LCDC);
+    this.palleteData = memory.read(REG_PALETTE);
 
     this.executeImpl();
 
@@ -66,6 +68,12 @@ class LCD {
   }
 
   renderLine() {
+    let pallete = [
+      this.palleteData & 0x3,
+      (this.palleteData & 0xc) >> 2,
+      (this.palleteData & 0x30) >> 2,
+      (this.palleteData & 0xc0) >> 2,
+    ];
     if (this.ly < LCD_HEIGHT) {
       let bgLine = (this.scy + this.ly) & 0xff;
       for (let x = 0; x < LCD_WIDTH; x += 8) {
@@ -86,7 +94,7 @@ class LCD {
           // Maybe render the line all at once, after it's calculated?
           if (this.screen[this.ly][x+7-pixelX] !== pixel) {
             this.screen[this.ly][x+7-pixelX] = pixel;
-            this.setPixel(x + 7 - pixelX, this.ly, pixel);
+            this.setPixel(x + 7 - pixelX, this.ly, pallete[pixel]);
           }
         }
       }

@@ -10,7 +10,7 @@
     <script type="text/javascript" src="io.js"></script>
     <script type="text/javascript" src="cartridge.js"></script>
     <script type="text/javascript" src="timer.js"></script>
-    <script type="text/javascript" src="roms/CpuInstrs.js"></script>
+    <script type="text/javascript" src="roms/Tetris.js"></script>
   </head>
   <body style="background-color: black">
     <canvas id="screen" width="800" height="140"></canvas>
@@ -21,7 +21,7 @@
         stack: new RAM(127),
         internalRAM: new RAM(0x2000),
         io: new IO(new RAM(0x80)),
-        cartridge: new Cartridge(new CpuInstrs()),
+        cartridge: new Cartridge(new Tetris()),
         enableInterruptRegister: new RAM(1),
       });
       let cpu = new CPU(memory);
@@ -43,9 +43,9 @@
           let actualHz = (cpu.clock - prevClock) / elapsed * 1000;
           hzs.push(actualHz/1000000);
         }
-        if (cpu.clock > 300011152) {
-          throw new Error("CPU ran for too long");
-        }
+        // if (cpu.clock > 300011152) {
+        //   throw new Error("CPU ran for too long");
+        // }
         prevTime = currentTime;
         prevClock = cpu.clock;
         while (cpu.clock < prevClock + clocksPerFrame) {
