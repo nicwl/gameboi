@@ -8,6 +8,7 @@ const REG_WX = 0xff4b;
 const LCD_HEIGHT = 144;
 const LCD_WIDTH = 160;
 
+
 class LCD {
   constructor(memory, canvas) {
     this.memory = memory;
@@ -91,6 +92,9 @@ class LCD {
       }
     }
     this.ly = (this.ly + 1) % 154;
+    if (this.ly == LCD_HEIGHT) {
+      this.memory.write(REG_IF, this.memory.read(REG_IF) | INT_VBLANK);
+    }
   }
 
   getBackgroundTileMapAddress() {

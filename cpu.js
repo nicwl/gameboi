@@ -14,8 +14,27 @@ const FLAG_N = 6;
 const FLAG_H = 5;
 const FLAG_C = 4;
 
+const REG_IE = 0xffff;
+const REG_IF = 0xff0f;
+
+const INT_VBLANK = (1<<0);
+const INT_LCD_STAT = (1<<1);
+const INT_TIMER = (1<<2);
+const INT_SERIAL = (1<<3);
+const INT_JOYPAD = (1<<4);
+
+
 class CPU {
   constructor(memory) {
+    this.setFlag.__noReturn = true;
+    this.resetFlag.__noReturn = true;
+    this.setRegisterByteReg.__noReturn = true;
+    this.store8At16ValueAddress.__noReturn = true;
+    this.incrementRegister16.__noReturn = true;
+    this.decRegister16.__noReturn = true;
+    this.store8At16AddressValue.__noReturn = true;
+    this.jumpAbsolute16Pair.__noReturn = true;
+
     this.flags = 0;
     this.internalRegisters = new Array(10).fill(0);
     this.pc = 0;
@@ -29,6 +48,8 @@ class CPU {
     this.instructionSize = null;
     this.pcBreakpoints = {};
     this.instructionBreakpoints = {};
+    this.ime = 0;
+    this.halted = false;
   }
 
   getImmediate16() {
@@ -478,6 +499,13 @@ class CPU {
   }
 
   execute() {
+    if (!this.prefixCB && this.interrupt()) {
+      return;
+    }
+    if (this.halted) {
+      this.clock += 4;
+      return;
+    }
     this.jump = this.reljump = null;
     let instructionSet = this.prefixCB ? this.cbInstructionTable : this.instructions;
     let instruction = this.memory.read(this.pc);
@@ -489,19 +517,13 @@ class CPU {
     this.instructionSize = size;
     this.prefixCB = false;
     let prevFlags = this.flags;
-    try {
-      // runMicrocode returns true if it handles the pc and clock itself
-      if (!microcode.apply(this)) {
-        this.pc += size;
-        this.clock += time;
-      }
-    } catch (e) {
-      e.message += ". Running instruction " + instruction.toString(16);
-      if (instructionSet == this.cbInstructionTable) {
-        e.message += " in CB mode";
-      }
-      throw e;
+
+    // runMicrocode returns true if it handles the pc and clock itself
+    if (!microcode.apply(this)) {
+      this.pc += size;
+      this.clock += time;
     }
+
     if (this.flags !== prevFlags) {
       this.internalRegisters[F] = this.flags;
     }
@@ -513,6 +535,42 @@ class CPU {
     if (this.reljump !== null) {
       this.pc += this.reljump;
     }
+  }
+
+  interrupt() {
+    if (this.ime === 0) return false;
+    let interrupts = this.memory.read(REG_IE) & this.memory.read(REG_IF) & 0x1f;
+    if (interrupts === 0) return false;
+
+    if (interrupts & INT_VBLANK) {
+      this.doInterrupt(0x40);
+    } else if (interrupts & INT_LCD_STAT) {
+      this.doInterrupt(0x48);
+    } else if (interrupts & INT_TIMER) {
+      this.doInterrupt(0x50);
+    } else if (interrupts & INT_SERIAL) {
+      this.doInterrupt(0x58);
+    } else if (interrupts & INT_JOYPAD) {
+      this.doInterrupt(0x60);
+    }
+
+    return true;
+  }
+
+  doInterrupt(addr) {
+    console.log("Interrupt: " + addr.toString(16));
+    this.ime = 0;
+    this.memory.write(REG_IF, 0);
+    if (this.halted) {
+      this.pc++;
+      this.halted = false;
+    }
+    let sp = (this.internalRegisters[S] << 8) | this.internalRegisters[P];
+    this.memory.write(--sp, (this.pc & 0xff00) >> 8);
+    this.memory.write(--sp, this.pc & 0x00ff);
+    this.internalRegisters[S] = (sp & 0xff00) >> 8;
+    this.internalRegisters[P] = sp & 0x00ff;
+    this.pc = addr;
   }
 
   pcLow() {
@@ -543,12 +601,26 @@ class CPU {
     throw new Error("CPU stopped");
   }
 
+  enableInterrupts() {
+    console.log("Interrupts enabled " + this.pc.toString(16));
+    this.ime = 0x1;
+  }
+
+  disableInterrupts() {
+    console.log("Interrupts disabled " + this.pc.toString(16));
+    this.ime = 0;
+  }
+
+  halt() {
+    this.halted = true;
+  }
+
   failIfFalse(condition) {
     return condition;
   }
 
   unimplementedInstruction() {
-    console.log("Instruction 0x" + this.memory.read(this.pc).toString(16) + " not implemented");
+    //console.log("Instruction 0x" + this.memory.read(this.pc).toString(16) + " not implemented");
   }
 
   push(x) {
@@ -580,42 +652,56 @@ class CPU {
     return false;
   }
 
-  fallbackToEvaluatingMicrocode(microcode) {
-    console.log("Couldn't compile microcode");
+  fallbackToEvaluatingMicrocode(instruction, microcode, message) {
+    console.log(`Couldn't compile microcode for ${instruction.toString(16)}: ${message}`);
     return function() {
       this.runMicrocode(microcode);
     }
   }
 
-  compileMicrocode(microcode) {
+  compileMicrocode(instruction, microcode) {
+    if (microcode.length == 1) {
+      return microcode[0];
+    }
     let stk = [];
-    let variable = 0;
     let functionBody = "";
+    let declared = {};
     for (let m of microcode) {
       let args = [];
       let length = m.length;
       if (length > stk.length) {
-        return this.fallbackToEvaluatingMicrocode(microcode);
+        return this.fallbackToEvaluatingMicrocode(instruction, microcode, `not enough arguments for ${m.name}`);
       }
       if (length > 0) {
         args = stk.splice(-length);
       }
-      let varName = "v" + variable;
-      variable++;
+      let variable = 0;
+      let varName = null;
+      do {
+        varName = "v" + variable;
+        variable++;
+      } while (stk.indexOf(varName) !== -1);
+
+      let prefix = "";
+      if (!declared[varName]) {
+        prefix = "let ";
+        declared[varName] = true;
+      }
       let line = null;
       if (m.__pushFunction) {
-        line = `let ${varName} = ${m.apply(this)};`;
+        line = `${prefix}${varName} = ${m.apply(this)};`;
       } else {
-        line = `let ${varName} = this.${m.name}.apply(this, [${args}]);`
+        line = `${prefix}${varName} = this.${m.name}.apply(this, [${args}]);`
       }
       if (m.name == "failIfFalse") {
         line += `if (!${varName}) return;`;
+      } else if (!(m.__noReturn)) {
+        stk.push(varName);
       }
-      stk.push(varName);
       functionBody += line + "\n";
     }
     if (stk.length > 1) {
-      return this.fallbackToEvaluatingMicrocode(microcode);
+      return this.fallbackToEvaluatingMicrocode(instruction, microcode, `extra arguments: ${stk}`);
     }
     return eval(`(function() {\n${functionBody}\n})`);
   }
@@ -625,7 +711,7 @@ class CPU {
     for (let i = 0; i < 256; i++) {
       if (table.hasOwnProperty(i)) {
         let [size, clocks, microcode] = table[i];
-        a[i] = [size, clocks, this.compileMicrocode(microcode)];
+        a[i] = [size, clocks, this.compileMicrocode(i, microcode)];
       }
     }
     return a;
@@ -858,7 +944,7 @@ class CPU {
                      this.push(P),this.push(S), this.incrementRegister16,
                      this.push(P), this.getRegister8,this.push(S), this.getRegister8, this.get8from16,
                      this.push(P),this.push(S), this.incrementRegister16,
-                      this.jumpAbsolute16Pair, this.unimplementedInstruction /* enable interrupts */]],
+                      this.jumpAbsolute16Pair, this.enableInterrupts]],
       0xfe: [2, 8, [this.getImmediate8, this.cp8]],
     }
   }
@@ -949,13 +1035,13 @@ class CPU {
       // STOP
       0x10: [2, 4, [this.stop]],
       // HALT
-      0x76: [1, 4, [this.unimplementedInstruction]],
+      0x76: [1, 4, [this.halt]],
       // Prefix CB
       0xCB: [1, 4, [this.setPrefixCB]],
       // DI
-      0xF3: [1, 4, [this.unimplementedInstruction]],
+      0xF3: [1, 4, [this.disableInterrupts]],
       // EI
-      0xFB: [1, 4, [this.unimplementedInstruction]]
+      0xFB: [1, 4, [this.enableInterrupts]]
     };
   }
 
