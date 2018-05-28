@@ -704,8 +704,22 @@ class CPU {
       0x18: [2, 12, [push(true), this.getImmediate8, this.jumpRelative8]],
       0x20: [2, 8, [push(FLAG_Z), this.checkFlag, this.negate, this.getImmediate8, this.jumpRelative8]],
       0xc2: [3, 16, [push(FLAG_Z), this.checkFlag, this.negate, this.getImmediate16, this.jumpAbsolute16]],
+      0xd2: [3, 16, [push(FLAG_C), this.checkFlag, this.negate, this.getImmediate16, this.jumpAbsolute16]],
       0xca: [3, 16, [push(FLAG_Z), this.checkFlag, this.getImmediate16, this.jumpAbsolute16]],
+      0xda: [3, 16, [push(FLAG_C), this.checkFlag, this.getImmediate16, this.jumpAbsolute16]],
       0x28: [2, 8, [push(FLAG_Z), this.checkFlag, this.getImmediate8, this.jumpRelative8]],
+      0xcc: [3, 24, [this.push(FLAG_Z), this.checkFlag, this.failIfFalse,
+                     push(P), push(S), this.decRegister16,
+                     push(P), this.getRegister8, push(S), this.getRegister8, this.pcHigh, this.store8At16AddressValue,
+                     push(P), push(S), this.decRegister16,
+                     push(P), this.getRegister8, push(S), this.getRegister8, this.pcLow, this.store8At16AddressValue,
+                     this.push(true), this.getImmediate16, this.jumpAbsolute16]],
+      0xdc: [3, 24, [this.push(FLAG_C), this.checkFlag, this.failIfFalse,
+                     push(P), push(S), this.decRegister16,
+                     push(P), this.getRegister8, push(S), this.getRegister8, this.pcHigh, this.store8At16AddressValue,
+                     push(P), push(S), this.decRegister16,
+                     push(P), this.getRegister8, push(S), this.getRegister8, this.pcLow, this.store8At16AddressValue,
+                     this.push(true), this.getImmediate16, this.jumpAbsolute16]],
       0xcd: [3, 24, [push(P), push(S), this.decRegister16,
                      push(P), this.getRegister8, push(S), this.getRegister8, this.pcHigh, this.store8At16AddressValue,
                      push(P), push(S), this.decRegister16,
@@ -723,6 +737,12 @@ class CPU {
                      push(P), push(S), this.decRegister16,
                      push(P), this.getRegister8, push(S), this.getRegister8, this.pcLow, this.store8At16AddressValue,
                      this.push(true), this.getImmediate16, this.jumpAbsolute16]],
+      0xc0: [1, 8, [this.push(FLAG_Z), this.checkFlag, this.negate, this.failIfFalse,
+                    push(true), push(P), this.getRegister8, push(S), this.getRegister8, this.get8from16,
+                    push(P), push(S), this.incrementRegister16,
+                    push(P), this.getRegister8, push(S), this.getRegister8, this.get8from16,
+                    push(P), push(S), this.incrementRegister16,
+                    this.jumpAbsolute16Pair]],
       0xd0: [1, 8, [this.push(FLAG_C), this.checkFlag, this.negate, this.failIfFalse,
                     push(true), push(P), this.getRegister8, push(S), this.getRegister8, this.get8from16,
                     push(P), push(S), this.incrementRegister16,
@@ -746,6 +766,11 @@ class CPU {
                       push(P), this.getRegister8, push(S), this.getRegister8, this.get8from16,
                       push(P), push(S), this.incrementRegister16,
                       this.jumpAbsolute16Pair]],
+      0xd9: [1, 16, [push(true), push(P), this.getRegister8, push(S), this.getRegister8, this.get8from16,
+                      push(P), push(S), this.incrementRegister16,
+                      push(P), this.getRegister8, push(S), this.getRegister8, this.get8from16,
+                      push(P), push(S), this.incrementRegister16,
+                      this.jumpAbsolute16Pair, this.unimplementedInstruction /* enable interrupts */]],
       0xfe: [2, 8, [this.getImmediate8, this.cp8]],
     }
   }
@@ -818,12 +843,23 @@ class CPU {
                      this.push(P), this.push(S), this.decRegister16,
                      this.push(P), this.getRegister8, this.push(S), this.getRegister8, this.pcLow, this.store8At16AddressValue,
                      this.push(true), this.push(0x28), this.push(0x00), this.jumpAbsolute16Pair]],
-      // 0xff: [1, 16, [this.push(P), this.push(S), this.decRegister16,
-      //                this.push(P), this.getRegister8, this.push(S), this.getRegister8, this.pcHigh, this.store8At16AddressValue,
-      //                this.push(P), this.push(S), this.decRegister16,
-      //                this.push(P), this.getRegister8, this.push(S), this.getRegister8, this.pcLow, this.store8At16AddressValue,
-      //                this.push(true), this.push(0x38), this.push(0x00), this.jumpAbsolute16Pair]]
+      0xc7: [1, 16, this.getRST(0x00)],
+      0xd7: [1, 16, this.getRST(0x10)],
+      0xe7: [1, 16, this.getRST(0x20)],
+      0xf7: [1, 16, this.getRST(0x30)],
+      0xcf: [1, 16, this.getRST(0x08)],
+      0xdf: [1, 16, this.getRST(0x18)],
+      0xef: [1, 16, this.getRST(0x28)],
+      0xff: [1, 16, this.getRST(0x38)],
     }
+  }
+
+  getRST(dest) {
+    return [this.push(P), this.push(S), this.decRegister16,
+            this.push(P), this.getRegister8, this.push(S), this.getRegister8, this.pcHigh, this.store8At16AddressValue,
+            this.push(P), this.push(S), this.decRegister16,
+            this.push(P), this.getRegister8, this.push(S), this.getRegister8, this.pcLow, this.store8At16AddressValue,
+            this.push(true), this.push(dest), this.push(0x00), this.jumpAbsolute16Pair];
   }
 
   // microcode generation

@@ -9,7 +9,7 @@
     <script type="text/javascript" src="ram.js"></script>
     <script type="text/javascript" src="io.js"></script>
     <script type="text/javascript" src="cartridge.js"></script>
-    <script type="text/javascript" src="roms/OpRp.js"></script>
+    <script type="text/javascript" src="roms/Jumps.js"></script>
   </head>
   <body style="background-color: black">
     <canvas id="screen" width="800" height="140"></canvas>
@@ -20,7 +20,7 @@
         stack: new RAM(127),
         internalRAM: new RAM(0x2000),
         io: new IO(new RAM(0x80)),
-        cartridge: new Cartridge(new OpRp()),
+        cartridge: new Cartridge(new Jumps()),
       });
       let cpu = new CPU(memory);
       let lcd = new LCD(memory, document.getElementById("screen"));
