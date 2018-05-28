@@ -637,7 +637,7 @@ class CPU {
 
   get16BitAddTable() {
     return {
-      0x09: [1, 8, [this.push(B), this.getRegister8, this.push(C), this.getRegister8, this.add16]],
+      0x09: [1, 8, [this.push(C), this.getRegister8, this.push(B), this.getRegister8, this.add16]],
       0x19: [1, 8, [this.push(E), this.getRegister8, this.push(D), this.getRegister8, this.add16]],
       0x29: [1, 8, [this.push(L), this.getRegister8, this.push(H), this.getRegister8, this.add16]],
       0x39: [1, 8, [this.push(P), this.getRegister8, this.push(S), this.getRegister8, this.add16]],
