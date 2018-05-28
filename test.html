@@ -9,7 +9,8 @@
     <script type="text/javascript" src="ram.js"></script>
     <script type="text/javascript" src="io.js"></script>
     <script type="text/javascript" src="cartridge.js"></script>
-    <script type="text/javascript" src="roms/Interrupts.js"></script>
+    <script type="text/javascript" src="timer.js"></script>
+    <script type="text/javascript" src="roms/CpuInstrs.js"></script>
   </head>
   <body style="background-color: black">
     <canvas id="screen" width="800" height="140"></canvas>
@@ -20,12 +21,13 @@
         stack: new RAM(127),
         internalRAM: new RAM(0x2000),
         io: new IO(new RAM(0x80)),
-        cartridge: new Cartridge(new Interrupts()),
+        cartridge: new Cartridge(new CpuInstrs()),
         enableInterruptRegister: new RAM(1),
       });
       let cpu = new CPU(memory);
       let lcd = new LCD(memory, document.getElementById("screen"));
       let speaker = new Speaker(memory);
+      let timer = new Timer(memory.io);
       const CPU_HZ = 4.1*1000000;
       let clocksPerFrame = null;
       let hzs = [];
@@ -51,6 +53,9 @@
           cpu.execute();
           if (cpu.clock % 100 < startClock % 100) {
             lcd.execute();
+          }
+          if ((cpu.clock & 0xf) < (startClock & 0xf)) {
+            timer.execute();
           }
           speaker.execute();
         }

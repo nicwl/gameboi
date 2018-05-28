@@ -538,15 +538,22 @@ class CPU {
   }
 
   interrupt() {
-    if (this.ime === 0) return false;
+    if (this.ime === 0 && !this.halted) return false;
     let interrupts = this.memory.read(REG_IE) & this.memory.read(REG_IF) & 0x1f;
     if (interrupts === 0) return false;
+    if (this.halted) {
+      this.halted = false;
+    }
+    if (this.ime === 0) {
+      return true;
+    }
 
     if (interrupts & INT_VBLANK) {
       this.doInterrupt(0x40);
     } else if (interrupts & INT_LCD_STAT) {
       this.doInterrupt(0x48);
     } else if (interrupts & INT_TIMER) {
+      console.log("firing timer interrupt");
       this.doInterrupt(0x50);
     } else if (interrupts & INT_SERIAL) {
       this.doInterrupt(0x58);
