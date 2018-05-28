@@ -180,16 +180,34 @@ class CPU {
   }
 
   sub8(value) {
-    let result = this.internalRegisters[A] += ((~value) + 1) & 0xff;
-    this.flags &= ~((1<<FLAG_Z) | (1 << FLAG_C)); // no idea what half carry is
-    if (result > 0xff) {
+    let a = this.internalRegisters[A];
+    this.flags = (1 << FLAG_N);
+    if ((a & 0x0f) < (value & 0x0f)) {
+      this.flags |= (1 << FLAG_H);
+    }
+    if (a < value) {
       this.flags |= (1 << FLAG_C);
     }
-    if ((result & 0xff) == 0) {
+    this.internalRegisters[A] = (a - value) & 0xff;
+    if (this.internalRegisters[A] == 0) {
       this.flags |= (1 << FLAG_Z);
     }
-    this.flags |= (1 << FLAG_N);
-    this.internalRegisters[A] &= 0xff;
+  }
+
+  sbc8(value) {
+    let a = this.internalRegisters[A];
+    let carry = (this.flags & (1 << FLAG_C)) >> FLAG_C;
+    this.flags = (1 << FLAG_N);
+    if ((a & 0x0f) - (value & 0x0f) < carry) {
+      this.flags |= (1 << FLAG_H);
+    }
+    if (a < (value + carry)) {
+      this.flags |= (1 << FLAG_C);
+    }
+    this.internalRegisters[A] = (a - value - carry) & 0xff;
+    if (this.internalRegisters[A] == 0) {
+      this.flags |= (1 << FLAG_Z);
+    }
   }
 
   bit8(bit, byte) {
@@ -263,11 +281,14 @@ class CPU {
   }
 
   adc8(value) {
-    let carry = (this.flags | (1 << FLAG_C)) >> FLAG_C;
+    let carry = (this.flags & (1 << FLAG_C)) >> FLAG_C;
     this.flags = 0;
     let result = this.internalRegisters[A] + value + carry;
     if (result > 0xff) {
       this.flags |= (1 << FLAG_C);
+    }
+    if ((value & 0xf) + (this.internalRegisters[A] & 0xf) + carry > 0xf) {
+      this.flags |= (1 << FLAG_H);
     }
     if ((result & 0xff) == 0) {
       this.flags |= (1 << FLAG_Z);
@@ -597,6 +618,7 @@ class CPU {
       0xc6: [2, 8, [this.getImmediate8, this.add8]],
       0xd6: [2, 8, [this.getImmediate8, this.sub8]],
       0xce: [2, 8, [this.getImmediate8, this.adc8]],
+      0xde: [2, 8, [this.getImmediate8, this.sbc8]],
       0xee: [2, 8, [this.getImmediate8, this.xor8]],
       0xf6: [2, 8, [this.getImmediate8, this.or8]],
       0x35: [1, 12, [this.push(L), this.getRegister8, this.push(H), this.getRegister8, this.get8from16,
