@@ -55,7 +55,7 @@ class CPU {
 
   decRegister8(reg) {
     this.flags &= ~((1 << FLAG_Z) | (1 << FLAG_H));
-    if ((this.internalRegisters[reg] & 0x0f) > 0) {
+    if ((this.internalRegisters[reg] & 0x0f) == 0) {
       this.flags |= (1 << FLAG_H);
     }
     this.internalRegisters[reg] = (this.internalRegisters[reg] + 0xff) & 0xff;
@@ -86,11 +86,11 @@ class CPU {
 
   incrementRegister8(reg) {
     this.internalRegisters[reg]++;
-    this.internalRegisters[reg] &= 0xff;
     this.flags &= ~((1 << FLAG_Z) | (1 << FLAG_N) | (1 << FLAG_H));
-    if (this.internalRegisters[reg] & 0xf == 0) {
+    if ((this.internalRegisters[reg] & 0xf) == 0) {
       this.flags |= (1 << FLAG_H);
     }
+    this.internalRegisters[reg] &= 0xff;
     if (this.internalRegisters[reg] == 0) {
       this.flags |= (1 << FLAG_Z);
     }
@@ -344,13 +344,20 @@ class CPU {
   }
 
   rlc8(value) {
+    let orig = value;
     let carry = (value & (1 << 7)) >> 7;
-    value = (value << 7) & 0xff;
+    value = ((value << 1) | carry) & 0xff;
     this.flags = (carry << FLAG_C);
     if (value == 0) {
       this.flags |= (1 << FLAG_Z);
     }
     return value;
+  }
+
+  rlca(value) {
+    let result = this.rlc8(value);
+    this.flags &= ~(1 << FLAG_Z);
+    return result;
   }
 
   srl8(value) {
@@ -372,6 +379,39 @@ class CPU {
       this.flags |= (1 << FLAG_Z);
     }
     return result;
+  }
+
+  rrc8(value) {
+    let carry = (value & 0x1);
+    let result = (value >> 1) | (carry << 7);
+    this.flags = carry << FLAG_C;
+    if (result == 0) {
+      this.flags |= (1 << FLAG_Z);
+    }
+    return result;
+  }
+
+  sla8(value) {
+    let carry = value >> 7;
+    value <<= 1;
+    value &= 0xff;
+    this.flags = carry << FLAG_C;
+    if (value == 0) {
+      this.flags |= (1 << FLAG_Z);
+    }
+    return value;
+  }
+
+  sra8(value) {
+    let carry = value & 0x1;
+    let msb = value & 0x80;
+    value >>= 1;
+    value |= msb;
+    this.flags = carry << FLAG_C;
+    if (value == 0) {
+      this.flags |= (1 << FLAG_Z);
+    }
+    return value;
   }
 
   swap8(value) {
@@ -504,6 +544,10 @@ class CPU {
     this.flags &= ~(1 << flag);
   }
 
+  invertFlag(flag) {
+    this.flags ^= (1 << flag);
+  }
+
   stop() {
     throw new Error("CPU stopped");
   }
@@ -612,8 +656,9 @@ class CPU {
     return {
       0x27: [1, 4, [this.daa8]],
       0x2f: [1, 4, [this.complement8]],
+      0x3f: [1, 4, [this.push(FLAG_N), this.resetFlag, this.push(FLAG_H), this.resetFlag, this.push(FLAG_C), this.invertFlag]],
       0xe6: [2, 8, [this.getImmediate8, this.and8]],
-      0x07: [1, 4, [this.push(A), this.getRegister8, this.rlc8, this.push(A), this.getRegister8, this.setRegisterByteReg]],
+      0x07: [1, 4, [this.push(A), this.getRegister8, this.rlca, this.push(A), this.setRegisterByteReg]],
       0x37: [1, 4, [this.push(FLAG_N), this.resetFlag, this.push(FLAG_H), this.resetFlag, this.push(FLAG_C), this.setFlag]],
       0xc6: [2, 8, [this.getImmediate8, this.add8]],
       0xd6: [2, 8, [this.getImmediate8, this.sub8]],
@@ -666,7 +711,7 @@ class CPU {
         6: this.or8,
         7: this.cp8
       }
-      table[instruction] = [1, clocks, [this.resetFlags].concat(load, application[operation])];
+      table[instruction] = [1, clocks, [].concat(load, application[operation])];
     }
     return table;
   }
@@ -695,8 +740,9 @@ class CPU {
       0x04: [1, 4, [push(B), this.incrementRegister8]],
       0x14: [1, 4, [push(D), this.incrementRegister8]],
       0x24: [1, 4, [push(H), this.incrementRegister8]],
-      0x17: [1, 4, [push(A), this.getRegister8, this.rl8, this.push(A), this.setRegisterByteReg]],
-      0x1f: [1, 4, [push(A), this.getRegister8, this.rr8, this.push(A), this.setRegisterByteReg]],
+      0x17: [1, 4, [push(A), this.getRegister8, this.rl8, this.push(A), this.setRegisterByteReg, this.push(FLAG_Z), this.resetFlag]],
+      0x0f: [1, 4, [push(A), this.getRegister8, this.rrc8, this.push(A), this.setRegisterByteReg, this.push(FLAG_Z), this.resetFlag]],
+      0x1f: [1, 4, [push(A), this.getRegister8, this.rr8, this.push(A), this.setRegisterByteReg, this.push(FLAG_Z), this.resetFlag]],
       0x03: [1, 8, [push(C), push(B), this.incrementRegister16]],
       0x13: [1, 8, [push(E), push(D), this.incrementRegister16]],
       0x23: [1, 8, [push(L), push(H), this.incrementRegister16]],
