@@ -101,11 +101,13 @@ class LCD {
   renderSprites() {
     for (let i = 0; i < 40; i++) {
       let y = this.memory.read(OAM_TABLE + i*4);
+      y -= 16;
       if (y === 0 || y >= 160) continue;
       if (y > this.ly) continue;
       if (y + 8 < this.ly) continue;
       let tile = this.memory.read(OAM_TABLE + i*4 + 2);
       let x = this.memory.read(OAM_TABLE + i*4 + 1);
+      x -= 8;
       let attrib = this.memory.read(OAM_TABLE + i*4 + 3);
       let xflip = (attrib & (1 << 5)) > 0;
       let yflip = (attrib & (1 << 6)) > 0;
