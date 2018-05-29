@@ -21,6 +21,7 @@
         stack: new RAM(127),
         internalRAM: new RAM(0x2000),
         io: new IO(new RAM(0x80)),
+        oam: new RAM(0xa0),
         cartridge: new Cartridge(new PokemonRed()),
         enableInterruptRegister: new RAM(1),
       });
