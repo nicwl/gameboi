@@ -103,8 +103,8 @@ class LCD {
       let y = this.memory.read(OAM_TABLE + i*4);
       y -= 16;
       if (y === 0 || y >= 160) continue;
-      if (y > this.ly) continue;
-      if (y + 8 < this.ly) continue;
+      if (this.ly < y) continue;
+      if (y + 8 <= this.ly) continue;
       let tile = this.memory.read(OAM_TABLE + i*4 + 2);
       let x = this.memory.read(OAM_TABLE + i*4 + 1);
       x -= 8;
@@ -129,7 +129,7 @@ class LCD {
           msb >>= (pixelX - 1);
         }
         let pixel = msb | ((byte1 & (1 << pixelX)) >> pixelX);
-        if (pixel != 0) {
+        if (pixel != this.screen[this.ly][x+7-pixelX]) {
           this.screen[this.ly][x+7-pixelX] = pixel;
           this.setPixel(x+7-pixelX, this.ly, pixel);
         }
