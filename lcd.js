@@ -5,7 +5,7 @@ const REG_LY = 0xff44;
 const REG_LYC = 0Xff45;
 const REG_WY = 0xff4a;
 const REG_WX = 0xff4b;
-const REG_PALETTE = 0xff47;
+const REG_BG_PALETTE = 0xff47;
 const LCD_HEIGHT = 144;
 const LCD_WIDTH = 160;
 
@@ -46,7 +46,7 @@ class LCD {
     this.wy = memory.read(REG_WY);
     this.wx = memory.read(REG_WX);
     this.lcdc = memory.read(REG_LCDC);
-    this.palleteData = memory.read(REG_PALETTE);
+    this.bgPalleteData = memory.read(REG_BG_PALETTE);
 
     this.executeImpl();
 
@@ -68,41 +68,66 @@ class LCD {
   }
 
   renderLine() {
-    let pallete = [
-      this.palleteData & 0x3,
-      (this.palleteData & 0xc) >> 2,
-      (this.palleteData & 0x30) >> 2,
-      (this.palleteData & 0xc0) >> 2,
-    ];
     if (this.ly < LCD_HEIGHT) {
-      let bgLine = (this.scy + this.ly) & 0xff;
-      for (let x = 0; x < LCD_WIDTH; x += 8) {
-        let bgY = bgLine;
-        let bgX = (this.scx + x) & 0xff;
-        let tileX = bgX >> 3;
-        let tileY = bgY >> 3;
-        let mapIdx = tileY*32 + tileX;
-        //console.log(memory.mapAddress(this.getBackgroundTileMapAddress() + mapIdx));
-        let tile = this.memory.read(this.getBackgroundTileMapAddress() + mapIdx);
-        //console.log(tile);
-        let pixelY = bgY & 0x7;
-        let byte1 = this.memory.read(this.getTileDataTableAddress() + tile*16 + pixelY*2);
-        let byte2 = this.memory.read(this.getTileDataTableAddress() + tile*16 + pixelY*2 + 1);
-        for (let pixelX = 0; pixelX < 8; pixelX++) {
-          let pixel = ((byte2 & (1 << pixelX)) >> (pixelX - 1)) | ((byte1 & (1 << pixelX)) >> pixelX);
-          // This condition saves a lot of time, but may be less effective after boot.
-          // Maybe render the line all at once, after it's calculated?
-          if (this.screen[this.ly][x+7-pixelX] !== pixel) {
-            this.screen[this.ly][x+7-pixelX] = pixel;
-            this.setPixel(x + 7 - pixelX, this.ly, pallete[pixel]);
-          }
-        }
-      }
+      this.renderBackgroundLine();
+      this.renderWindowLine();
     }
     this.ly = (this.ly + 1) % 154;
     if (this.ly == LCD_HEIGHT) {
       this.memory.write(REG_IF, this.memory.read(REG_IF) | INT_VBLANK);
     }
+  }
+
+  renderBackgroundLine() {
+    let pallete = [
+      this.bgPalleteData & 0x3,
+      (this.bgPalleteData & 0xc) >> 2,
+      (this.bgPalleteData & 0x30) >> 2,
+      (this.bgPalleteData & 0xc0) >> 2,
+    ];
+    if (!this.backgroundDisplayEnabled()) {
+      for (let x = 0; x < LCD_WIDTH; x++) {
+        this.screen[this.ly][x] = 0;
+        this.setPixel(x, this.ly, 0);
+      }
+      return;
+    }
+    let bgLine = (this.scy + this.ly) & 0xff;
+    for (let x = 0; x < LCD_WIDTH; x += 8) {
+      let bgY = bgLine;
+      let bgX = (this.scx + x) & 0xff;
+      let tileX = bgX >> 3;
+      let tileY = bgY >> 3;
+      let mapIdx = tileY*32 + tileX;
+      //console.log(memory.mapAddress(this.getBackgroundTileMapAddress() + mapIdx));
+      let tile = this.memory.read(this.getBackgroundTileMapAddress() + mapIdx);
+      if (this.getTileDataTableAddress() == 0x8800) {
+        tile = (tile + 128) & 0xff;
+      }
+      //console.log(tile);
+      let pixelY = bgY & 0x7;
+      let byte1 = this.memory.read(this.getTileDataTableAddress() + tile*16 + pixelY*2);
+      let byte2 = this.memory.read(this.getTileDataTableAddress() + tile*16 + pixelY*2 + 1);
+      for (let pixelX = 0; pixelX < 8; pixelX++) {
+        let msb = byte2 & (1 << pixelX);
+        if (pixelX == 0) {
+          msb <<= 1;
+        } else {
+          msb >>= (pixelX - 1);
+        }
+        let pixel = msb | ((byte1 & (1 << pixelX)) >> pixelX);
+        // This condition saves a lot of time, but may be less effective after boot.
+        // Maybe render the line all at once, after it's calculated?
+        if (this.screen[this.ly][x+7-pixelX] !== pallete[pixel]) {
+          this.screen[this.ly][x+7-pixelX] = pallete[pixel];
+          this.setPixel(x + 7 - pixelX, this.ly, pallete[pixel]);
+        }
+      }
+    }
+  }
+
+  renderWindowLine() {
+    // pass
   }
 
   getBackgroundTileMapAddress() {
@@ -118,7 +143,11 @@ class LCD {
   }
 
   windowDisplayEnabled() {
-    return (this.lcdc & (1 << 5)) > 0;
+    return (this.lcdc & (1 << 5)) > 0 && (this.wx > 0 && this.wx <= 166) && (this.wy > 0 && this.wy <= 143);
+  }
+
+  backgroundDisplayEnabled() {
+    return (this.lcdc & 0x1);
   }
 
   tileData() {

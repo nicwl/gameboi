@@ -2,6 +2,8 @@ class Timer {
   constructor(io) {
     this.io = io;
     this.tick = 0;
+    this.firstTime = null;
+    this.nRuns = 0;
   }
 
   // Called at a rate of 16384 Hz
@@ -19,7 +21,17 @@ class Timer {
     this.io.write(0x06, this.tac);
   }
 
+  hertz() {
+    return this.nRuns / (performance.now() - this.firstTime) * 1000;
+  }
+
   executeImpl() {
+    if (this.firstTime === null) {
+      this.firstTime = performance.now();
+      this.nRuns = 0;
+    } else {
+      this.nRuns++;
+    }
     this.tick = (this.tick + 1) & 0xffff;
     if ((this.tick & 0xf) === 0) {
       this.div = (this.div + 1) & 0xff;

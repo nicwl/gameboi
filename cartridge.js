@@ -32,7 +32,7 @@ class Cartridge {
     if (this.mbcType == NO_MBC) {
       return;
     }
-    if (this.ramEnabled && 0xa000 < addr && addr < 0xc000) {
+    if (this.ramEnabled && 0xa000 <= addr && addr < 0xc000) {
       this.ram[(addr - 0xa000) + this.selectedRamBank*0x2000] = value & 0xff;
       return;
     }
@@ -49,7 +49,6 @@ class Cartridge {
         selected = 1;
       }
       this.selectedRomBank = selected;
-      console.log("Selected ROM bank " + selected);
     } else if (0x4000 <= addr && addr < 0x6000) {
       if (value < 4) {
         this.selectedRamBank = value;

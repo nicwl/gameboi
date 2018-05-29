@@ -553,7 +553,6 @@ class CPU {
     } else if (interrupts & INT_LCD_STAT) {
       this.doInterrupt(0x48);
     } else if (interrupts & INT_TIMER) {
-      console.log("firing timer interrupt");
       this.doInterrupt(0x50);
     } else if (interrupts & INT_SERIAL) {
       this.doInterrupt(0x58);
@@ -565,7 +564,6 @@ class CPU {
   }
 
   doInterrupt(addr) {
-    console.log("Interrupt: " + addr.toString(16));
     this.ime = 0;
     this.memory.write(REG_IF, 0);
     if (this.halted) {
@@ -605,17 +603,15 @@ class CPU {
   }
 
   stop() {
-    throw new Error("CPU stopped");
+    //throw new Error("CPU stopped");
   }
 
   enableInterrupts() {
-    console.log("Interrupts enabled " + this.pc.toString(16));
     this.ime = 0x1;
   }
 
   disableInterrupts() {
-    console.log("Interrupts disabled " + this.pc.toString(16));
-    this.ime = 0;
+    this.ime = 0x0;
   }
 
   halt() {
@@ -624,10 +620,6 @@ class CPU {
 
   failIfFalse(condition) {
     return condition;
-  }
-
-  unimplementedInstruction() {
-    //console.log("Instruction 0x" + this.memory.read(this.pc).toString(16) + " not implemented");
   }
 
   push(x) {

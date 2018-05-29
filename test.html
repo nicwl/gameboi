@@ -10,7 +10,7 @@
     <script type="text/javascript" src="io.js"></script>
     <script type="text/javascript" src="cartridge.js"></script>
     <script type="text/javascript" src="timer.js"></script>
-    <script type="text/javascript" src="roms/Tetris.js"></script>
+    <script type="text/javascript" src="roms/PokemonRed.js"></script>
   </head>
   <body style="background-color: black">
     <canvas id="screen" width="800" height="140"></canvas>
@@ -21,7 +21,7 @@
         stack: new RAM(127),
         internalRAM: new RAM(0x2000),
         io: new IO(new RAM(0x80)),
-        cartridge: new Cartridge(new Tetris()),
+        cartridge: new Cartridge(new PokemonRed()),
         enableInterruptRegister: new RAM(1),
       });
       let cpu = new CPU(memory);
@@ -51,11 +51,11 @@
         while (cpu.clock < prevClock + clocksPerFrame) {
           let startClock = cpu.clock;
           cpu.execute();
-          if (cpu.clock % 100 < startClock % 100) {
+          if (cpu.clock % 441 < startClock % 441) {
             lcd.execute();
           }
-          if ((cpu.clock & 0xf) < (startClock & 0xf)) {
-            timer.execute();
+          for (let i = startClock; i < cpu.clock; i += 4) {
+            if (i % 12 === 0) timer.execute();
           }
           speaker.execute();
         }
