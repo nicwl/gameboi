@@ -20,14 +20,14 @@ class IO {
   }
 
   read(addr) {
+    if (addr === 0) {
+      this.correctJOYP();
+    }
     return this.memory.read(addr);
   }
 
   write(addr, value) {
     this.memory.write(addr, value);
-    if (addr === 0) {
-      this.correctJOYP();
-    }
     if (addr == 0x50 && this.bootstrapROMEnabled) {
       this.bootstrapROMEnabled = (value != 1);
     }
@@ -36,11 +36,12 @@ class IO {
   correctJOYP() {
     let reg = this.memory.read(0);
     let value = 0xf;
+    let state = this.getControllerButtonState() ? this.getControllerButtonState() : this.buttonState;
     if ((reg & 0x20) == 0) {
-      value &= this.buttonState & 0x0f;
+      value &= state & 0x0f;
     }
     if ((reg & 0x10) == 0) {
-      value &= (this.buttonState & 0xf0) >> 4;
+      value &= (state & 0xf0) >> 4;
     }
     reg &= 0xf0;
     reg |= value;
@@ -48,17 +49,43 @@ class IO {
     this.memory.write(0, reg);
   }
 
+  getControllerButtonState() {
+    if (!navigator.getGamepads) {
+      return null;
+    }
+    let controller = navigator.getGamepads()[0];
+    if (controller === null) {
+      return null;
+    }
+    let state = [
+      controller.buttons[13].pressed,
+      controller.buttons[12].pressed,
+      controller.buttons[14].pressed,
+      controller.buttons[15].pressed,
+      controller.buttons[9].pressed,
+      controller.buttons[8].pressed,
+      controller.buttons[1].pressed,
+      controller.buttons[0].pressed,
+    ];
+    let bitstate = 0;
+    for (let i of state) {
+      bitstate <<= 1;
+      if (!i) {
+        bitstate |= 1;
+      }
+    }
+    return bitstate;
+  }
+
   buttonPress(name) {
     let bit = this.buttonBits[name];
     this.buttonState &= (~(1 << bit)) & 0xff;
-    this.correctJOYP();
     console.log(name + " pressed");
   }
 
   buttonRelease(name) {
     let bit = this.buttonBits[name];
     this.buttonState |= 1 << bit;
-    this.correctJOYP();
     console.log(name + " released");
   }
 
