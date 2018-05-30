@@ -54,11 +54,11 @@
           cpu.execute();
           if (cpu.clock % 441 < startClock % 441) {
             lcd.execute();
+            speaker.execute();
           }
           for (let i = startClock; i < cpu.clock; i += 4) {
             if (i % 12 === 0) timer.execute();
           }
-          speaker.execute();
         }
         requestAnimationFrame(step);
       }

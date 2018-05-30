@@ -11,6 +11,8 @@ const LCD_HEIGHT = 144;
 const LCD_WIDTH = 160;
 const OAM_TABLE = 0xFE00;
 const SPRITE_PATTERN_TABLE = 0x8000;
+const REG_OBP0 = 0xff48;
+const REG_OBP1 = 0xff48;
 
 
 class LCD {
@@ -99,18 +101,29 @@ class LCD {
   }
 
   renderSprites() {
-    for (let i = 0; i < 40; i++) {
+    if (!this.spritesEnabled()) {
+      return;
+    }
+    let palettes = [this.memory.read(REG_OBP0), this.memory.read(REG_OBP1)];
+    let seen = 0;
+    for (let i = 39; i >= 0; i--) {
+      if (seen == 10) {
+        break;
+      }
       let y = this.memory.read(OAM_TABLE + i*4);
-      y -= 16;
       if (y === 0 || y >= 160) continue;
+      y -= 16;
       if (this.ly < y) continue;
       if (y + 8 <= this.ly) continue;
+      seen += 1;
       let tile = this.memory.read(OAM_TABLE + i*4 + 2);
       let x = this.memory.read(OAM_TABLE + i*4 + 1);
       x -= 8;
       let attrib = this.memory.read(OAM_TABLE + i*4 + 3);
       let xflip = (attrib & (1 << 5)) > 0;
       let yflip = (attrib & (1 << 6)) > 0;
+      let palette = palettes[(attrib & (1 << 4)) >> 4];
+      let behindBackground = (attrib & (1 << 7)) > 0;
       let pixelY = this.ly - y;
       if (yflip) {
         pixelY = 7 - pixelY;
@@ -119,8 +132,12 @@ class LCD {
       let byte2 = this.memory.read(SPRITE_PATTERN_TABLE + tile*16 + pixelY*2 + 1);
       for (let j = x; j < x + 8; j++) {
         let pixelX = j - x;
+        let pixelOut = pixelX;
         if (xflip) {
-          pixelX = 7 - pixelX;
+          pixelOut = 7 - pixelX;
+        }
+        if (behindBackground && this.screen[this.ly][x + 7 - pixelOut] != 0) {
+          continue;
         }
         let msb = byte2 & (1 << pixelX);
         if (pixelX == 0) {
@@ -129,9 +146,13 @@ class LCD {
           msb >>= (pixelX - 1);
         }
         let pixel = msb | ((byte1 & (1 << pixelX)) >> pixelX);
-        if (pixel != this.screen[this.ly][x+7-pixelX]) {
-          this.screen[this.ly][x+7-pixelX] = pixel;
-          this.setPixel(x+7-pixelX, this.ly, pixel);
+        if (pixel == 0) {
+          continue;
+        }
+        let colour = (palette & (0x3 << (2*pixel))) >> (2*pixel);
+        if (colour != this.screen[this.ly][x + 7 - pixelOut]) {
+          this.screen[this.ly][x + 7 - pixelOut] = colour;
+          this.setPixel(x + 7 - pixelOut, this.ly, colour);
         }
       }
     }
@@ -248,6 +269,6 @@ class LCD {
   }
 
   spritesEnabled() {
-    return (this.lcdr & (1 << 1)) > 0;
+    return (this.lcdc & (1 << 1)) > 0;
   }
 }
