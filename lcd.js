@@ -165,7 +165,10 @@ class LCD {
       (this.bgPalleteData & 0x30) >> 2,
       (this.bgPalleteData & 0xc0) >> 2,
     ];
-    for (let x = 0; x < LCD_WIDTH; x += 8) {
+
+    let initial = xStart % 8;
+    if (initial == 7) initial = 0;
+    for (let x = 0; x < LCD_WIDTH + 8; x += 8) {
       let bgY = bgLine;
       let bgX = null;
       if (wrap) {
@@ -187,6 +190,8 @@ class LCD {
       let byte1 = this.memory.read(this.getTileDataTableAddress()  + tile*16 + pixelY*2);
       let byte2 = this.memory.read(this.getTileDataTableAddress()  + tile*16 + pixelY*2 + 1);
       for (let pixelX = 0; pixelX < 8; pixelX++) {
+        let offset = 7 - initial;
+        if (x+offset-pixelX < 0 || x+offset-pixelX >= LCD_WIDTH) continue;
         let msb = byte2 & (1 << pixelX);
         if (pixelX == 0) {
           msb <<= 1;
@@ -196,9 +201,9 @@ class LCD {
         let pixel = msb | ((byte1 & (1 << pixelX)) >> pixelX);
         // This condition saves a lot of time, but may be less effective after boot.
         // Maybe render the line all at once, after it's calculated?
-        if (this.screen[this.ly][x+7-pixelX] !== pallete[pixel]) {
-          this.screen[this.ly][x+7-pixelX] = pallete[pixel];
-          this.setPixel(x + 7 - pixelX, this.ly, pallete[pixel]);
+        if (this.screen[this.ly][x+offset-pixelX] !== pallete[pixel]) {
+          this.screen[this.ly][x+offset-pixelX] = pallete[pixel];
+          this.setPixel(x + offset - pixelX, this.ly, pallete[pixel]);
         }
       }
     }
@@ -222,7 +227,7 @@ class LCD {
     }
     let wLine = (this.ly - this.wy);
     if (wLine < 0 || wLine >= LCD_HEIGHT) return;
-    this.renderBackgroundOrWindowLine(wLine, this.wx, this.getWindowTileMapAddress(), false);
+    this.renderBackgroundOrWindowLine(wLine, this.wx - 7, this.getWindowTileMapAddress(), false);
   }
 
   getBackgroundTileMapAddress() {
