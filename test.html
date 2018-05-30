@@ -14,13 +14,32 @@
   </head>
   <body style="background-color: black">
     <canvas id="screen" width="800" height="140"></canvas>
+    <br />
+    <button id="a_button">A</button>
+    <button id="b_button">B</button>
+    <button id="start_button">start</button>
+    <button id="select_button">select</button>
+    <button id="up_button">up</button>
+    <button id="down_button">down</button>
+    <button id="left_button">left</button>
+    <button id="right_button">right</button>
     <script type="text/javascript">
+      let buttons = {
+        a: document.getElementById("a_button"),
+        b: document.getElementById("b_button"),
+        start: document.getElementById("start_button"),
+        select: document.getElementById("select_button"),
+        up: document.getElementById("up_button"),
+        down: document.getElementById("down_button"),
+        left: document.getElementById("left_button"),
+        right: document.getElementById("right_button"),
+      };
       let memory = new Memory({
         bootstrapROM: new BootstrapROM(),
         videoRAM: new RAM(0x2000),
         stack: new RAM(127),
         internalRAM: new RAM(0x2000),
-        io: new IO(new RAM(0x80)),
+        io: new IO(new RAM(0x80), buttons),
         oam: new RAM(0xa0),
         cartridge: new Cartridge(new PokemonRed()),
         enableInterruptRegister: new RAM(1),
