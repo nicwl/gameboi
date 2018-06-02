@@ -1,6 +1,6 @@
 # gameboi
 
-In-browser gameboy emulator.
+In-browser gameboy emulator. This is currently just a huge pile of hacks. Please forgive me. I was in a rush because I really wanted to play Pokémon.
 
 ## How to play a game (to be improved later)
 
